@@ -6,6 +6,7 @@ import { trycatchhandler } from "../utils/asyncHandler.js";
 export const VerifyMiddleWare = trycatchhandler(async (req, res, next) => {
   try {
     console.log("hitting");
+
     const token =
       req.cookies?.AccessToken ||
       req.header("Authorization")?.replace("Bearer ", "");

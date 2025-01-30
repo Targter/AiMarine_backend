@@ -196,7 +196,8 @@ export const loginUser = async (req, res) => {
 
     const options = {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production", // ✅ Secure only in production
+      sameSite: "None", // ✅ Allows cross-origin cookies
     };
 
     return res
