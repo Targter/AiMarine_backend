@@ -141,8 +141,9 @@ export const VerifyMail = async (req, res) => {
     console.log("loggedInuser:", loggedInUser);
 
     const options = {
-      httpOnly: true,
-      secure: true,
+        httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'None',
     };
     return res
       .status(200)
