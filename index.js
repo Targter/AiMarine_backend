@@ -19,6 +19,10 @@ connectDB()
       // optinally we throwing the error to the global error handler
       throw error;
     });
+
+    app.get("/", (req, res) => {
+      res.send("Hello World!");
+    });
     app.listen(process.env.PORT || 8080, () => {
       console.log(`server is running at Port : ${process.env.PORT}`);
     });
