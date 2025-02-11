@@ -241,7 +241,8 @@ export const logoutUser = async (req, res) => {
 
 // user Authorization
 export const UserAuthorization = async (req, res) => {
-  console.log("useris Authenticated");
+  // console.log("useris Authenticated");
+  // console.log(req.user);
   res.json({ message: "Authenticated", user: req.user, authenticated: true });
 };
 // ForgetPassword

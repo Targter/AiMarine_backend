@@ -61,7 +61,6 @@ const userSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
-
 //
 userSchema.pre("save", function (next) {
   if (this.subscriptionType === "trial" && !this.subscriptionEndDate) {
@@ -69,7 +68,6 @@ userSchema.pre("save", function (next) {
   }
   next();
 });
-
 // update the subscription type:
 userSchema.methods.updateSubscription = async function (subscriptionType) {
   try {
@@ -80,7 +78,8 @@ userSchema.methods.updateSubscription = async function (subscriptionType) {
       subscriptionEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
     } else if (subscriptionType === "premium") {
       subscriptionEndDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
-    } else if (subscriptionType === "trial") {
+    } else if (subscriptionType === "premium-yearly") {
+      subscriptionEndDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
       // Trial users should keep their 1-year expiry unless already set
       if (!this.subscriptionEndDate) {
         subscriptionEndDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
@@ -100,7 +99,6 @@ userSchema.methods.updateSubscription = async function (subscriptionType) {
     throw new Error("Subscription update failed");
   }
 };
-
 // Middleware to update `updatedAt` field on chat updates
 chatSchema.pre("updateOne", function (next) {
   this.set({ updatedAt: Date.now() });
