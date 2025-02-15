@@ -4,7 +4,7 @@ import User from "../modles/useSchema.js";
 
 const addOrUpdateChat = async (req, res) => {
   const { userId, chatId, messages } = req.body;
-
+  console.log(process.env.ACESS_TOKEN_SECRET);
   console.log(messages);
   console.log(userId);
   console.log(chatId);

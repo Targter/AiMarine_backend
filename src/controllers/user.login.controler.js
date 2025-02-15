@@ -30,141 +30,130 @@ const generateOtp = () => {
 };
 
 // export default generateOtp;
-
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  // secure: true,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false,
+  },
+  // console.log("process",process.env.EMAIL_USER);
+});
 //   Register user
 export const RegisterUser = async (req, res) => {
-  const { email } = req.body;
+  try {
+    const { email } = req.body;
+    console.log("Register called for:", email);
 
-  // Check if the user already exists
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    return res.status(400).json({ message: "User already exists." });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists." });
+    }
+
+    const otp = generateOtp();
+    console.log("Generated OTP:", otp);
+
+    await TempUser.deleteOne({ email });
+    const tempUser = new TempUser({
+      email,
+      otp,
+      otpExpiresAt: Date.now() + 60000, // Expires in 2 minutes
+    });
+
+    await tempUser.save();
+    const emailResponse = await sendOtpEmail(email, otp);
+    console.log("Email response:", emailResponse);
+    if (emailResponse && !emailResponse.success) {
+      return res.status(500).json({ message: emailResponse.error });
+    }
+
+    res.status(200).json({ message: "OTP sent to email." });
+  } catch (error) {
+    console.error("Error registering user:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
   }
-
-  // Generate OTP
-  const otp = generateOtp();
-  console.log("otp", otp);
-  // Save OTP with temp user
-
-  await TempUser.deleteOne({ email });
-  const tempUser = new TempUser({
-    email,
-    otp,
-    otpExpiresAt: Date.now() + 300000,
-  }); // OTP expires in 5 minutes
-
-  await tempUser.save();
-
-  // Send OTP via email (or SMS)
-  sendOtpEmail(email, otp); // Implement your own sendOtpEmail function
-
-  res.status(200).json({ message: "OTP sent to email." });
 };
-
 // sendOtpMail
 const sendOtpEmail = async (email, otp) => {
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Email Verification OTP",
-    text: `Your OTP for email verification is: ${otp}`,
-  };
+  // const transporter = nodemailer.createTransport({
+  //   host: "smtp.sendgrid.net",
+  //   port: 465,
+  //   secure: true,
+  //   auth: {
+  //     user: process.env.EMAIL_USER,
+  //     pass: process.env.EMAIL_PASS,
+  //   },
+  //   tls: {
+  //     rejectUnauthorized: false,
+  //   },
+  // });
 
   try {
+    console.log("email:", email);
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Marine Verification OTP",
+      text: `Your OTP for email verification is: ${otp}`,
+    };
+    console.log("process", process.env.EMAIL_USER);
     const info = await transporter.sendMail(mailOptions);
     console.log("Email sent:", info.response);
   } catch (error) {
-    console.error("Error sending mail", error);
-    throw new Error("Failed to send mail");
+    console.error("Error sending email:", error.message);
+    return { success: false, error: "Failed to send OTP email" };
   }
 };
 
 // Verify Otp
 
 export const VerifyMail = async (req, res) => {
-  const { email, otp, username, password } = req.body;
-
   try {
-    // Find the temporary user by email
-    const tempUser = await TempUser.findOne({ email });
+    const { email, otp, username, password } = req.body;
 
+    const tempUser = await TempUser.findOne({ email });
     if (!tempUser) {
       return res
         .status(400)
-        .json({ message: "Invalid email or user not found ." });
+        .json({ message: "Invalid email or user not found." });
     }
 
-    // Check if the OTP matches and is not expired
-    console.log("otp:", otp);
-    console.log("userotp", tempUser.otp);
     if (String(tempUser.otp).trim() !== String(otp).trim()) {
       return res.status(400).json({ message: "Invalid OTP." });
     }
-    console.log("called check");
+
     if (tempUser.otpExpiresAt < Date.now()) {
       return res.status(400).json({ message: "OTP expired." });
     }
 
-    // Move user to the User collection
+    const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new User({
-      username: username,
-      email: email,
+      username,
+      email,
       emailVerified: true,
-      password: password, // Consider hashing the password before saving it in production
+      password: hashedPassword,
     });
 
     await newUser.save();
-
-    // Delete the temp user
     await TempUser.deleteOne({ email });
 
-    // Generate access token
-    const { AccessToken, RefreshToken } = await generateAccessandRefreshToken(
-      newUser._id
-    );
-    console.log(AccessToken);
-
-    const loggedInUser = await User.findById(newUser._id).select(
-      " -password -refreshToken"
-    );
-
-    console.log("loggedInuser:", loggedInUser);
-
-    const options = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "None",
-    };
-    return res
+    res
       .status(200)
-      .cookie("AccessToken", AccessToken, options)
-      .cookie("RefreshToken", RefreshToken)
-      .json({
-        success: true,
-        user: loggedInUser,
-        message: "Email successfully verified. User registered.",
-      });
+      .json({ message: "Email successfully verified. User registered." });
   } catch (error) {
-    console.error("Error verifying OTP", error);
+    console.error("Error verifying OTP:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
 // Login
 export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password } = req.body;
     // 1. Check if user exists
     const user = await User.findOne({ email });
 
@@ -183,12 +172,6 @@ export const loginUser = async (req, res) => {
     const { RefreshToken, AccessToken } = await generateAccessandRefreshToken(
       user._id
     );
-    // console.log(process.env.ACCESS_TOKEN_SECRET);
-    // console.log("Access:", AccessToken);
-    // console.log("Refresh:", RefreshToken);
-    // 4. Optionally save refresh token to user (if you are using refresh tokens for security)
-    // user.refreshToken = RefreshToken;
-    // await user.save({ validateBeforeSave: false });
 
     // 5. Send response with tokens
     const loggedInUser = await User.findById(user._id).select(
@@ -247,11 +230,11 @@ export const UserAuthorization = async (req, res) => {
 };
 // ForgetPassword
 export const initiatePasswordReset = async (req, res) => {
-  const { email } = req.body;
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
+    const { email } = req.body;
     const user = await User.findOne({ email });
     // console.log("user", user);
     if (!user) {
@@ -267,7 +250,11 @@ export const initiatePasswordReset = async (req, res) => {
       { upsert: true, new: true }
     );
 
-    await sendOtpEmail(email, otp);
+    const emailResponse = await sendOtpEmail(email, otp);
+    if (emailResponse && !emailResponse.success) {
+      await session.abortTransaction();
+      return res.status(500).json({ message: emailResponse.error });
+    }
 
     await session.commitTransaction();
     res.status(200).json({ message: "OTP sent to your email" });
@@ -281,10 +268,9 @@ export const initiatePasswordReset = async (req, res) => {
 };
 
 export const verifyOtp = async (req, res) => {
-  const { email, otp } = req.body;
-  console.log("called:", otp);
-
   try {
+    const { email, otp } = req.body;
+    console.log("called:", otp);
     const tempUser = await TempUser.findOne({ email });
     if (
       !tempUser ||
