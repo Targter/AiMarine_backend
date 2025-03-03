@@ -6,6 +6,6 @@ import {
 import { VerifyMiddleWare } from "../middlewares/authentication.middleware.js";
 const router = Router();
 
-router.route("/update-subscription").post(VerifyMiddleWare, updateSubscrition);
+router.route("/update-subscription").post(updateSubscrition);
 router.route("/renewsubscription").post(renewSub);
 export default router;

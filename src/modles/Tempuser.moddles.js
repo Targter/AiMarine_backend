@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 // Define Temporary User Schema
 const tempUserSchema = new mongoose.Schema({
